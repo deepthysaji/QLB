@@ -1,6 +1,7 @@
-def execute_quantum_circuit(circuit_description):
-    from qiskit import QuantumCircuit, Aer, execute
+from qiskit import QuantumCircuit
+from qiskit_aer import AerSimulator
 
+def execute_circuit(circuit_description):
     # Extract number of qubits and circuit operations from the description
     num_qubits = circuit_description['num_qubits']
     operations = circuit_description['circuit']
@@ -19,17 +20,20 @@ def execute_quantum_circuit(circuit_description):
             qc.cx(targets[0], targets[1])
         elif gate == "Z":
             qc.z(targets)
+        else:
+            raise ValueError(f"Invalid gate: {gate}")
 
-    # Use the Aer simulator to execute the circuit
-    simulator = Aer.get_backend('aer_simulator')
-    result = execute(qc, backend=simulator, shots=1024).result()
-
-    # Get the state vector and measurement probabilities
-    state_vector = result.get_statevector()
-    counts = result.get_counts(qc)
-
-    # Convert counts to probabilities
-    probabilities = [counts.get(key, 0) / 1024 for key in qc.measurement]
+    # Save the statevector and run simulation
+    qc.save_statevector()
+    backend = AerSimulator()
+    state_vector = backend.run(qc).result().get_statevector()
+    
+    # Get probabilities using shots-based simulation
+    qc_with_measure = qc.copy()
+    qc_with_measure.measure_all()
+    counts = backend.run(qc_with_measure, shots=1024).result().get_counts()
+    total_shots = sum(counts.values())
+    probabilities = {state: count/total_shots for state, count in counts.items()}
 
     return {
         "state_vector": state_vector.tolist(),
